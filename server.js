@@ -4,11 +4,20 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config();
+const User = require('./models/user');
+const Task = require('./models/task');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? process.env.CLIENT_URL 
+    : 'http://localhost:3000',
+  credentials: true
+}));
 app.use(express.json());
 
 // Type Definitions
@@ -75,8 +84,19 @@ const resolvers = {
   },
   Mutation: {
     register: async (_, { username, email, password }) => {
-      // No auth needed for registration
-      // Implement registration logic
+      const existingUser = await User.findOne({ 
+        $or: [{ email }, { username }] 
+      });
+      
+      if (existingUser) {
+        throw new Error('User already exists');
+      }
+
+      const user = new User({ username, email, password });
+      await user.save();
+      
+      const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
+      return { token, user };
     },
     login: async (_, { email, password }) => {
       // No auth needed for login
